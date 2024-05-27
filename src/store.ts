@@ -10,36 +10,45 @@ import { logger } from './utils/logger';
 // Increment this when persist state has breaking changes
 const PERSIST_STATE_VERSION = 1;
 
-// Keeping everything here for now as state is simple
-// Will refactor into slices as necessary
+// Define the AppState interface
 interface AppState {
   chainConfigs: ChainMap<ChainConfig>;
-  setChainConfigs: (configs: ChainMap<ChainConfig>) => void;
   multiProvider: MultiProvider;
-  setMultiProvider: (mp: MultiProvider) => void;
   registry: IRegistry;
-  setRegistry: (registry: IRegistry) => void;
   bannerClassName: string;
+  setChainConfigs: (configs: ChainMap<ChainConfig>) => void;
+  setMultiProvider: (mp: MultiProvider) => void;
+  setRegistry: (registry: IRegistry) => void;
   setBanner: (className: string) => void;
 }
 
-export const useStore = create<AppState>()(
+// Initial state
+const initialState: AppState = {
+  chainConfigs: {},
+  multiProvider: new MultiProvider({}),
+  registry: new GithubRegistry(),
+  bannerClassName: '',
+  setChainConfigs: () => {},
+  setMultiProvider: () => {},
+  setRegistry: () => {},
+  setBanner: () => {},
+};
+
+// Zustand store
+export const useStore = create<AppState>(
   persist(
     (set, get) => ({
-      chainConfigs: {},
+      ...initialState,
       setChainConfigs: async (configs: ChainMap<ChainConfig>) => {
         const multiProvider = await buildMultiProvider(get().registry, configs);
         set({ chainConfigs: configs, multiProvider });
       },
-      multiProvider: new MultiProvider({}),
       setMultiProvider: (multiProvider: MultiProvider) => {
         set({ multiProvider });
       },
-      registry: new GithubRegistry(),
       setRegistry: (registry: IRegistry) => {
         set({ registry });
       },
-      bannerClassName: '',
       setBanner: (className: string) => set({ bannerClassName: className }),
     }),
     {
@@ -61,10 +70,11 @@ export const useStore = create<AppState>()(
             .catch((e) => logger.error('Error building MultiProvider', e));
         };
       },
-    },
-  ),
+    }
+  )
 );
 
+// Custom hooks for accessing specific parts of the state
 export function useRegistry() {
   return useStore((s) => s.registry);
 }
@@ -77,10 +87,10 @@ export function useMultiProvider() {
 // otherwise returns undefined
 export function useReadyMultiProvider() {
   const multiProvider = useMultiProvider();
-  if (multiProvider.getKnownChainNames().length === 0) return undefined;
-  return multiProvider;
+  return multiProvider.getKnownChainNames().length > 0 ? multiProvider : undefined;
 }
 
+// Function to build MultiProvider
 async function buildMultiProvider(registry: IRegistry, customChainConfigs: ChainMap<ChainConfig>) {
   const registryChainMetadata = await registry.getMetadata();
   return new MultiProvider({ ...registryChainMetadata, ...customChainConfigs });
